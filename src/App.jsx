@@ -17,14 +17,31 @@ import {
   Bell,
   Home,
   ShieldCheck,
-  Menu,
-  X
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Theme State ('dark' | 'light')
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('rw_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('rw_theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const [account, setAccount] = useState({
     name: 'Amaral Shakir',
@@ -32,6 +49,7 @@ export default function App() {
     monthly_session_quota: 10000,
     sessions_used_this_cycle: 1465,
   });
+
   const [projects, setProjects] = useState([
     {
       id: 'proj_1',
@@ -48,6 +66,7 @@ export default function App() {
       is_active: true,
     },
   ]);
+
   const [selectedProjectId, setSelectedProjectId] = useState('proj_1');
   const [sessions, setSessions] = useState([
     {
@@ -225,26 +244,22 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 bg-mesh-glow flex flex-col md:flex-row text-slate-100 selection:bg-blue-500 selection:text-white overflow-x-hidden">
+    <div className="min-h-screen w-full bg-slate-100 dark:bg-slate-950 bg-mesh-glow flex flex-col md:flex-row text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white transition-colors duration-300">
       
-      {/* Organic Background Lines Glow */}
-      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-gradient-to-bl from-blue-500/10 via-rose-500/5 to-transparent rounded-full blur-3xl pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-gradient-to-tr from-amber-500/5 via-emerald-500/5 to-transparent rounded-full blur-3xl pointer-events-none z-0" />
-
-      {/* DESKTOP ICON-ONLY LEFT SIDEBAR (HIDDEN ON MOBILE, VISIBLE ON MD+) */}
-      <aside className="hidden md:flex w-20 bg-slate-950/90 border-r border-slate-800/80 flex-col items-center justify-between py-6 shrink-0 z-30 relative min-h-screen">
+      {/* DESKTOP ICON-ONLY LEFT SIDEBAR */}
+      <aside className="hidden md:flex w-20 bg-white/90 dark:bg-slate-950/90 border-r border-slate-200 dark:border-slate-800/80 flex-col items-center justify-between py-6 shrink-0 z-30 relative min-h-screen shadow-lg dark:shadow-none transition-colors">
         
         {/* Top Brand Icon */}
         <div className="flex flex-col items-center gap-6">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/25 hover:scale-105 transition-transform"
+            className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform"
             title="RastreWeb SaaS"
           >
             <ShieldCheck size={24} />
           </button>
 
-          <div className="w-8 h-[1px] bg-slate-800/80" />
+          <div className="w-8 h-[1px] bg-slate-200 dark:bg-slate-800/80" />
 
           {/* Navigation Icons */}
           <nav className="flex flex-col items-center gap-3">
@@ -255,21 +270,21 @@ export default function App() {
               return (
                 <div key={item.id} className="relative group flex items-center">
                   {isActive && (
-                    <span className="absolute -left-[18px] w-2 h-6 bg-rose-500 rounded-r-full shadow-[0_0_12px_rgba(244,63,94,0.8)]" />
+                    <span className="absolute -left-[18px] w-2 h-6 bg-indigo-600 dark:bg-rose-500 rounded-r-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />
                   )}
 
                   <button
                     onClick={() => setActiveTab(item.id)}
                     className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                        ? 'bg-indigo-600 dark:bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                     }`}
                   >
                     <Icon size={20} />
                   </button>
 
-                  <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
+                  <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 text-white border border-slate-700/80 rounded-xl text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
                     {item.label}
                   </div>
                 </div>
@@ -282,30 +297,30 @@ export default function App() {
         <div className="flex flex-col items-center gap-3">
           <button
             onClick={() => setActiveTab('projects')}
-            className="w-11 h-11 rounded-2xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 flex items-center justify-center transition-colors relative group"
+            className="w-11 h-11 rounded-2xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60 flex items-center justify-center transition-colors relative group"
             title="Configurações"
           >
             <Settings size={20} />
-            <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
+            <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 text-white border border-slate-700/80 rounded-xl text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
               Configurações
             </div>
           </button>
 
           <button
             onClick={handleLogout}
-            className="w-11 h-11 rounded-2xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors relative group"
+            className="w-11 h-11 rounded-2xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors relative group"
             title="Sair"
           >
             <LogOut size={20} />
-            <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
+            <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 text-white border border-slate-700/80 rounded-xl text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
               Sair
             </div>
           </button>
         </div>
       </aside>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR (VISIBLE ONLY ON MOBILE < MD) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 z-50 px-4 py-2 flex items-center justify-around">
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 z-50 px-4 py-2 flex items-center justify-around">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -314,7 +329,7 @@ export default function App() {
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`p-2.5 rounded-xl flex flex-col items-center gap-1 transition-colors ${
-                isActive ? 'text-rose-400 bg-rose-500/10 font-bold' : 'text-slate-400 hover:text-slate-200'
+                isActive ? 'text-indigo-600 dark:text-rose-400 bg-indigo-500/10 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <Icon size={20} />
@@ -324,33 +339,42 @@ export default function App() {
         })}
       </div>
 
-      {/* MAIN CANVAS WRAPPER — FULL SCREEN RESPONSIVE */}
+      {/* MAIN CANVAS WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen relative z-10">
         
         {/* TOP HEADER BAR */}
-        <header className="min-h-[72px] px-4 sm:px-8 py-3 border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <header className="min-h-[72px] px-4 sm:px-8 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0 transition-colors">
           
           {/* Page Title */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex md:hidden items-center justify-center text-white font-bold text-xs">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-400 flex md:hidden items-center justify-center text-white font-bold text-xs">
               <ShieldCheck size={20} />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight">{getPageTitle()}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{getPageTitle()}</h1>
           </div>
 
           {/* Right Controls */}
           <div className="flex flex-wrap items-center gap-3 ml-auto">
             
+            {/* Theme Toggle Button (Light/Dark Switcher) */}
+            <button
+              onClick={toggleTheme}
+              className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm"
+              title={theme === 'dark' ? 'Alternar para Tema Claro' : 'Alternar para Tema Escuro'}
+            >
+              {theme === 'dark' ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} className="text-indigo-600" />}
+            </button>
+
             {/* Project Selector Pill */}
-            <div className="bg-slate-950/90 border border-slate-800 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs font-medium max-w-full">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <div className="bg-slate-100 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs font-medium max-w-full shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <select
                 value={selectedProjectId}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer truncate max-w-[180px] sm:max-w-xs"
+                className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer truncate max-w-[180px] sm:max-w-xs"
               >
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
+                  <option key={p.id} value={p.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                     {p.name} ({p.domain || 'sem domínio'})
                   </option>
                 ))}
@@ -359,7 +383,7 @@ export default function App() {
 
             {/* Notification Bell */}
             <button
-              className="w-9 h-9 rounded-full bg-slate-950/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-100 transition-colors relative shrink-0"
+              className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors relative shrink-0"
               title="Notificações"
             >
               <Bell size={16} />
@@ -367,11 +391,11 @@ export default function App() {
             </button>
 
             {/* User Avatar */}
-            <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-full p-1 pr-3 shrink-0">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white">
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-full p-1 pr-3 shrink-0">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 via-emerald-500 to-rose-500 flex items-center justify-center text-xs font-bold text-white shadow-md">
                 {user.user_metadata?.name ? user.user_metadata.name.charAt(0).toUpperCase() : 'A'}
               </div>
-              <span className="text-xs font-bold text-slate-200 hidden sm:inline">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 hidden sm:inline">
                 {user.user_metadata?.name || 'Amaral'}
               </span>
             </div>
@@ -380,7 +404,7 @@ export default function App() {
 
         </header>
 
-        {/* MAIN SCROLLABLE CONTENT AREA (FILLS ENTIRE SCREEN HEIGHT) */}
+        {/* MAIN SCROLLABLE CONTENT AREA */}
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto pb-24 md:pb-8">
           <div className="max-w-[1800px] mx-auto">
             {activeTab === 'dashboard' && (
