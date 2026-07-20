@@ -8,6 +8,7 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
   const [rageOnly, setRageOnly] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreatingSample, setIsCreatingSample] = useState(false);
+  const [localCreatedSessions, setLocalCreatedSessions] = useState([]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -19,58 +20,70 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
 
   const handleCreateSampleSession = async () => {
     setIsCreatingSample(true);
+
     const activeProject = projects?.[0];
-    const targetSiteKey = activeProject?.site_key || 'site_demo_sample';
+    const targetSiteKey = activeProject?.site_key;
     const sampleSessionId = 'sess_sample_' + Math.random().toString(36).substring(2, 8);
 
-    try {
-      const samplePayload = {
-        site_key: targetSiteKey,
-        session_id: sampleSessionId,
-        page_entry: window.location.origin + '/demo-produto',
-        device: 'desktop',
-        browser: 'Chrome',
-        started_at: new Date().toISOString(),
-        duration_seconds: 35,
-        rage_click: true,
-        events: [
-          { type: 4, data: { href: window.location.href, width: 1280, height: 720 }, timestamp: Date.now() - 10000 },
-          { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-10 bg-slate-900 text-white min-h-screen font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste Real RastreWeb' }] }] }] }] } }, timestamp: Date.now() - 9500 },
-          { type: 3, data: { source: 1, positions: [{ x: 200, y: 150, id: 4, timeOffset: 500 }] }, timestamp: Date.now() - 8000 },
-          { type: 3, data: { source: 2, type: 2, id: 4, x: 200, y: 150 }, timestamp: Date.now() - 5000 },
-        ],
-        heatmap_events: [
-          {
-            page_path: '/demo-produto',
-            event_type: 'click',
-            x_percent: 45,
-            y_percent: 30,
-            viewport_width: window.innerWidth,
-            session_id: sampleSessionId,
-          },
-        ],
-      };
+    // Create an instant local session object so the user sees it immediately on the table
+    const instantSession = {
+      id: 'sess_' + Date.now(),
+      session_id: sampleSessionId,
+      page_entry: 'https://meusite.com.br/produto/' + Math.floor(Math.random() * 500 + 1),
+      device: Math.random() > 0.5 ? 'desktop' : 'mobile',
+      browser: 'Chrome',
+      duration_seconds: Math.floor(Math.random() * 50) + 15,
+      rage_click: Math.random() > 0.4,
+      started_at: new Date().toISOString(),
+    };
 
-      const res = await fetch('/api/ingest-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(samplePayload),
-      });
+    setLocalCreatedSessions((prev) => [instantSession, ...prev]);
 
-      const data = await res.json();
+    // Send payload to backend /api/ingest-session if site_key is available
+    if (targetSiteKey) {
+      try {
+        const samplePayload = {
+          site_key: targetSiteKey,
+          session_id: sampleSessionId,
+          page_entry: instantSession.page_entry,
+          device: instantSession.device,
+          browser: instantSession.browser,
+          started_at: instantSession.started_at,
+          duration_seconds: instantSession.duration_seconds,
+          rage_click: instantSession.rage_click,
+          events: [
+            { type: 4, data: { href: instantSession.page_entry, width: 1280, height: 720 }, timestamp: Date.now() - 10000 },
+            { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-10 bg-slate-900 text-white min-h-screen font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste Real RastreWeb' }] }] }] }] } }, timestamp: Date.now() - 9500 },
+            { type: 3, data: { source: 1, positions: [{ x: 200, y: 150, id: 4, timeOffset: 500 }] }, timestamp: Date.now() - 8000 },
+            { type: 3, data: { source: 2, type: 2, id: 4, x: 200, y: 150 }, timestamp: Date.now() - 5000 },
+          ],
+          heatmap_events: [
+            {
+              page_path: instantSession.page_entry,
+              event_type: 'click',
+              x_percent: 45,
+              y_percent: 30,
+              viewport_width: window.innerWidth,
+              session_id: sampleSessionId,
+            },
+          ],
+        };
 
-      if (!res.ok) {
-        console.warn('Erro ao criar sessão via API:', data.error);
+        const res = await fetch('/api/ingest-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(samplePayload),
+        });
+
+        if (res.ok && onRefresh) {
+          await onRefresh();
+        }
+      } catch (err) {
+        console.error('Erro ao salvar sessão no Supabase:', err);
       }
-
-      if (onRefresh) {
-        await onRefresh();
-      }
-    } catch (err) {
-      console.error('Erro ao gerar amostra via API:', err);
-    } finally {
-      setIsCreatingSample(false);
     }
+
+    setIsCreatingSample(false);
   };
 
   // Demo fallback session if no real sessions exist yet
@@ -97,7 +110,13 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
     },
   ];
 
-  const displaySessions = (sessions && sessions.length > 0) ? sessions : demoFallbackSessions;
+  // Merge database sessions + locally created sessions + fallback demo sessions
+  const combinedSessions = [
+    ...localCreatedSessions,
+    ...(sessions || []),
+  ];
+
+  const displaySessions = combinedSessions.length > 0 ? combinedSessions : demoFallbackSessions;
 
   const filteredSessions = displaySessions.filter((s) => {
     const matchesSearch =
@@ -129,7 +148,7 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
             disabled={isCreatingSample}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-md shadow-indigo-600/20 disabled:opacity-50"
           >
-            <Plus size={14} /> {isCreatingSample ? 'Criando...' : 'Gerar Sessão de Exemplo'}
+            <Plus size={14} /> {isCreatingSample ? 'Criando...' : '+ Gerar Sessão de Exemplo'}
           </button>
 
           <button
