@@ -85,6 +85,9 @@ export default function TestPage({ projects, selectedProjectId, onCreateProject 
 
       if (res.ok && data.success) {
         addLog(`✅ SUCESSO! Ingestão aceita pelo servidor (HTTP 200). Sessão criada no Supabase: ${data.session_id}`, 'success');
+        if (onRefresh) {
+          await onRefresh();
+        }
       } else {
         addLog(`❌ ERRO (${res.status}): ${data.error || 'Falha na ingestão'}`, 'error');
       }

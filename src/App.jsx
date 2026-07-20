@@ -473,6 +473,7 @@ export default function App() {
               <Sessions
                 sessions={sessions.filter(s => !selectedProjectId || s.project_id === selectedProjectId || !s.project_id)}
                 onPlaySession={(s) => setActivePlayerSession(s)}
+                onRefresh={() => user && loadUserData(user)}
               />
             )}
 
@@ -497,6 +498,7 @@ export default function App() {
                 projects={projects}
                 selectedProjectId={selectedProjectId}
                 onCreateProject={handleCreateProject}
+                onRefresh={() => user && loadUserData(user)}
               />
             )}
 
