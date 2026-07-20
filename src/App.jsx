@@ -60,7 +60,6 @@ export default function App() {
 
     try {
       if (!isConfigured) {
-        // Fallback for offline demo mode
         setAccount({
           id: 'acc_demo_123',
           name: currentUser.user_metadata?.full_name || 'Minha Conta SaaS',
@@ -95,15 +94,13 @@ export default function App() {
         return;
       }
 
-      // 1. Fetch or auto-create account for current user
-      let { data: accData, error: accErr } = await supabase
+      let { data: accData } = await supabase
         .from('accounts')
         .select('*')
         .eq('owner_user_id', currentUser.id)
         .maybeSingle();
 
       if (!accData) {
-        // Create account if not present
         const { data: newAcc } = await supabase
           .from('accounts')
           .insert({
@@ -121,7 +118,6 @@ export default function App() {
       setAccount(accData);
 
       if (accData) {
-        // 2. Fetch Projects for this account
         const { data: projData } = await supabase
           .from('projects')
           .select('*')
@@ -134,7 +130,6 @@ export default function App() {
           const defaultProjId = selectedProjectId || projData[0].id;
           setSelectedProjectId(defaultProjId);
 
-          // 3. Fetch Sessions for this account
           const { data: sessData } = await supabase
             .from('sessions')
             .select('*')
@@ -143,7 +138,6 @@ export default function App() {
 
           setSessions(sessData || []);
 
-          // 4. Fetch Heatmap events
           const { data: hmData } = await supabase
             .from('heatmap_events')
             .select('*')
@@ -162,7 +156,6 @@ export default function App() {
     }
   }, [selectedProjectId]);
 
-  // Auth state listener
   useEffect(() => {
     if (!isConfigured) return;
 
@@ -190,7 +183,6 @@ export default function App() {
     };
   }, [loadUserData]);
 
-  // Handle Real Project Creation in Database
   const handleCreateProject = async (newProj) => {
     if (!account) return;
     const siteKey = 'site_' + Math.random().toString(36).substring(2, 14);
@@ -224,7 +216,6 @@ export default function App() {
       }
     }
 
-    // Fallback local create
     const localObj = {
       id: 'proj_' + Date.now(),
       name: newProj.name,
@@ -236,7 +227,6 @@ export default function App() {
     setSelectedProjectId(localObj.id);
   };
 
-  // Handle Real Project Deletion in Database
   const handleDeleteProject = async (projId) => {
     if (isConfigured && account) {
       await supabase.from('projects').delete().eq('id', projId).eq('account_id', account.id);
@@ -299,10 +289,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-100 dark:bg-slate-950 bg-mesh-glow flex flex-col md:flex-row text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white transition-colors duration-300">
+    <div className="h-screen w-screen bg-slate-100 dark:bg-slate-950 bg-mesh-glow flex flex-col md:flex-row text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white transition-colors duration-300 overflow-hidden">
       
-      {/* DESKTOP ICON-ONLY LEFT SIDEBAR */}
-      <aside className="hidden md:flex w-20 bg-white/90 dark:bg-slate-950/90 border-r border-slate-200 dark:border-slate-800/80 flex-col items-center justify-between py-6 shrink-0 z-30 relative min-h-screen shadow-lg dark:shadow-none transition-colors">
+      {/* DESKTOP FIXED ICON-ONLY LEFT SIDEBAR */}
+      <aside className="hidden md:flex w-20 h-screen sticky top-0 left-0 bg-white/90 dark:bg-slate-950/90 border-r border-slate-200 dark:border-slate-800/80 flex-col items-center justify-between py-6 shrink-0 z-40 shadow-lg dark:shadow-none transition-colors">
         
         {/* Top Brand Icon */}
         <div className="flex flex-col items-center gap-6">
@@ -394,11 +384,11 @@ export default function App() {
         })}
       </div>
 
-      {/* MAIN CANVAS WRAPPER */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen relative z-10">
+      {/* MAIN CANVAS WRAPPER — FIXED VIEWPORT WITH INDEPENDENT TAB SCROLLING */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10 min-w-0">
         
-        {/* TOP HEADER BAR */}
-        <header className="min-h-[72px] px-4 sm:px-8 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0 transition-colors">
+        {/* TOP HEADER BAR (FIXED STICKY) */}
+        <header className="h-[72px] px-4 sm:px-8 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0 transition-colors z-30">
           
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-400 flex md:hidden items-center justify-center text-white font-bold text-xs">
@@ -462,8 +452,8 @@ export default function App() {
 
         </header>
 
-        {/* MAIN SCROLLABLE CONTENT AREA */}
-        <main className="flex-1 p-4 sm:p-8 overflow-y-auto pb-24 md:pb-8">
+        {/* TAB CONTENT SCROLL AREA (ONLY THIS PORTION SCROLLS VERTICALLY) */}
+        <main className="flex-1 h-[calc(100vh-72px)] overflow-y-auto p-4 sm:p-8 pb-24 md:pb-8">
           <div className="max-w-[1800px] mx-auto">
             {activeTab === 'dashboard' && (
               <Dashboard
