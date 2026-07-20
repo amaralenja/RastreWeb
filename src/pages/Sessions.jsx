@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Play, Filter, AlertCircle, Monitor, Smartphone, Tablet, Search, Clock, ExternalLink, RefreshCw } from 'lucide-react';
+import { Play, Filter, AlertCircle, Monitor, Smartphone, Tablet, Search, Clock, ExternalLink, RefreshCw, Plus } from 'lucide-react';
+import { supabase, isConfigured } from '../lib/supabase';
 
-export default function Sessions({ sessions, onPlaySession, onRefresh }) {
+export default function Sessions({ sessions, onPlaySession, onRefresh, account, projects }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deviceFilter, setDeviceFilter] = useState('all');
   const [rageOnly, setRageOnly] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCreatingSample, setIsCreatingSample] = useState(false);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -13,6 +15,51 @@ export default function Sessions({ sessions, onPlaySession, onRefresh }) {
       await onRefresh();
     }
     setTimeout(() => setIsRefreshing(false), 500);
+  };
+
+  const handleCreateSampleSession = async () => {
+    setIsCreatingSample(true);
+    const activeProject = projects?.[0];
+    const sampleSessionId = 'sess_sample_' + Math.random().toString(36).substring(2, 8);
+
+    if (isConfigured && account && activeProject) {
+      try {
+        const storagePath = `${account.id}/${activeProject.id}/${sampleSessionId}.json`;
+        
+        // Sample DOM recording events
+        const sampleEvents = [
+          { type: 4, data: { href: window.location.href, width: 1280, height: 720 }, timestamp: Date.now() - 10000 },
+          { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-10 bg-slate-900 text-white min-h-screen text-center font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste Real RastreWeb' }] }] }] }] } }, timestamp: Date.now() - 9500 },
+          { type: 3, data: { source: 1, positions: [{ x: 200, y: 150, id: 4, timeOffset: 500 }] }, timestamp: Date.now() - 8000 },
+          { type: 3, data: { source: 2, type: 2, id: 4, x: 200, y: 150 }, timestamp: Date.now() - 5000 },
+        ];
+
+        // Upload sample recording to Supabase storage
+        await supabase.storage
+          .from('recordings')
+          .upload(storagePath, JSON.stringify(sampleEvents), { contentType: 'application/json', upsert: true });
+
+        // Insert session record in Postgres
+        await supabase.from('sessions').insert({
+          session_id: sampleSessionId,
+          account_id: account.id,
+          project_id: activeProject.id,
+          page_entry: 'https://exemplo.com.br/produto',
+          device: 'desktop',
+          browser: 'Chrome',
+          duration_seconds: 25,
+          rage_click: true,
+          storage_path: storagePath,
+          started_at: new Date().toISOString()
+        });
+
+        if (onRefresh) await onRefresh();
+      } catch (err) {
+        console.error('Erro ao criar sessão de amostra:', err);
+      }
+    }
+
+    setIsCreatingSample(false);
   };
 
   const filteredSessions = (sessions || []).filter((s) => {
@@ -39,13 +86,23 @@ export default function Sessions({ sessions, onPlaySession, onRefresh }) {
           </p>
         </div>
 
-        <button
-          onClick={handleManualRefresh}
-          className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors border border-slate-300 dark:border-slate-700"
-        >
-          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-          Atualizar Replays ({sessions?.length || 0})
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCreateSampleSession}
+            disabled={isCreatingSample}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-md shadow-indigo-600/20 disabled:opacity-50"
+          >
+            <Plus size={14} /> {isCreatingSample ? 'Criando...' : 'Gerar Sessão de Exemplo'}
+          </button>
+
+          <button
+            onClick={handleManualRefresh}
+            className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors border border-slate-300 dark:border-slate-700"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            Atualizar Replays ({sessions?.length || 0})
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -110,7 +167,7 @@ export default function Sessions({ sessions, onPlaySession, onRefresh }) {
                 filteredSessions.map((s) => (
                   <tr key={s.id || s.session_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-medium text-indigo-600 dark:text-indigo-400">
-                      {s.session_id.substring(0, 16)}...
+                      {(s.session_id || '').substring(0, 16)}...
                     </td>
                     <td className="py-3.5 px-4 max-w-xs truncate font-medium text-slate-900 dark:text-slate-100">
                       {s.page_entry || '/'}
@@ -152,7 +209,13 @@ export default function Sessions({ sessions, onPlaySession, onRefresh }) {
               ) : (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-500">
-                    Nenhuma gravação encontrada com os filtros selecionados.
+                    <p className="text-slate-400 font-medium">Nenhuma gravação de sessão encontrada no banco.</p>
+                    <button
+                      onClick={handleCreateSampleSession}
+                      className="mt-3 px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                    >
+                      <Plus size={14} /> Gerar Sessão de Exemplo para Assistir Replay
+                    </button>
                   </td>
                 </tr>
               )}

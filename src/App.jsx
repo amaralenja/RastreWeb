@@ -471,7 +471,9 @@ export default function App() {
 
             {activeTab === 'sessions' && (
               <Sessions
-                sessions={sessions.filter(s => !selectedProjectId || s.project_id === selectedProjectId || !s.project_id)}
+                sessions={sessions}
+                account={account}
+                projects={projects}
                 onPlaySession={(s) => setActivePlayerSession(s)}
                 onRefresh={() => user && loadUserData(user)}
               />
