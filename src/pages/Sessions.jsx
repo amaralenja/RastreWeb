@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Play, Filter, AlertCircle, Monitor, Smartphone, Tablet, Search, Clock, ExternalLink, RefreshCw, Plus } from 'lucide-react';
+import { supabase, isConfigured } from '../lib/supabase';
 
 export default function Sessions({ sessions, onPlaySession, onRefresh, account, projects }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,55 +20,86 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
   const handleCreateSampleSession = async () => {
     setIsCreatingSample(true);
     const activeProject = projects?.[0];
+    const targetSiteKey = activeProject?.site_key || 'site_demo_sample';
     const sampleSessionId = 'sess_sample_' + Math.random().toString(36).substring(2, 8);
 
-    if (activeProject && activeProject.site_key) {
-      try {
-        const samplePayload = {
-          site_key: activeProject.site_key,
-          session_id: sampleSessionId,
-          page_entry: window.location.origin + '/demo-produto',
-          device: 'desktop',
-          browser: 'Chrome',
-          started_at: new Date().toISOString(),
-          duration_seconds: 35,
-          rage_click: true,
-          events: [
-            { type: 4, data: { href: window.location.href, width: 1280, height: 720 }, timestamp: Date.now() - 10000 },
-            { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-10 bg-slate-900 text-white min-h-screen font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste Real RastreWeb' }] }] }] }] } }, timestamp: Date.now() - 9500 },
-            { type: 3, data: { source: 1, positions: [{ x: 200, y: 150, id: 4, timeOffset: 500 }] }, timestamp: Date.now() - 8000 },
-            { type: 3, data: { source: 2, type: 2, id: 4, x: 200, y: 150 }, timestamp: Date.now() - 5000 },
-          ],
-          heatmap_events: [
-            {
-              page_path: '/demo-produto',
-              event_type: 'click',
-              x_percent: 45,
-              y_percent: 30,
-              viewport_width: window.innerWidth,
-              session_id: sampleSessionId,
-            },
-          ],
-        };
+    try {
+      const samplePayload = {
+        site_key: targetSiteKey,
+        session_id: sampleSessionId,
+        page_entry: window.location.origin + '/demo-produto',
+        device: 'desktop',
+        browser: 'Chrome',
+        started_at: new Date().toISOString(),
+        duration_seconds: 35,
+        rage_click: true,
+        events: [
+          { type: 4, data: { href: window.location.href, width: 1280, height: 720 }, timestamp: Date.now() - 10000 },
+          { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-10 bg-slate-900 text-white min-h-screen font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste Real RastreWeb' }] }] }] }] } }, timestamp: Date.now() - 9500 },
+          { type: 3, data: { source: 1, positions: [{ x: 200, y: 150, id: 4, timeOffset: 500 }] }, timestamp: Date.now() - 8000 },
+          { type: 3, data: { source: 2, type: 2, id: 4, x: 200, y: 150 }, timestamp: Date.now() - 5000 },
+        ],
+        heatmap_events: [
+          {
+            page_path: '/demo-produto',
+            event_type: 'click',
+            x_percent: 45,
+            y_percent: 30,
+            viewport_width: window.innerWidth,
+            session_id: sampleSessionId,
+          },
+        ],
+      };
 
-        const res = await fetch('/api/ingest-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(samplePayload),
-        });
+      const res = await fetch('/api/ingest-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(samplePayload),
+      });
 
-        if (res.ok && onRefresh) {
-          await onRefresh();
-        }
-      } catch (err) {
-        console.error('Erro ao gerar amostra via API:', err);
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.warn('Erro ao criar sessão via API:', data.error);
       }
-    }
 
-    setIsCreatingSample(false);
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (err) {
+      console.error('Erro ao gerar amostra via API:', err);
+    } finally {
+      setIsCreatingSample(false);
+    }
   };
 
-  const filteredSessions = (sessions || []).filter((s) => {
+  // Demo fallback session if no real sessions exist yet
+  const demoFallbackSessions = [
+    {
+      id: 'demo_sess_1',
+      session_id: 'sess_demo_resemble_1',
+      page_entry: 'https://meusite.com.br/checkout',
+      device: 'desktop',
+      browser: 'Chrome',
+      duration_seconds: 42,
+      rage_click: true,
+      started_at: new Date(Date.now() - 10 * 60000).toISOString(),
+    },
+    {
+      id: 'demo_sess_2',
+      session_id: 'sess_demo_resemble_2',
+      page_entry: 'https://meusite.com.br/precos',
+      device: 'mobile',
+      browser: 'Safari',
+      duration_seconds: 18,
+      rage_click: false,
+      started_at: new Date(Date.now() - 45 * 60000).toISOString(),
+    },
+  ];
+
+  const displaySessions = (sessions && sessions.length > 0) ? sessions : demoFallbackSessions;
+
+  const filteredSessions = displaySessions.filter((s) => {
     const matchesSearch =
       (s.page_entry || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.session_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -105,7 +137,7 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
             className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors border border-slate-300 dark:border-slate-700"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-            Atualizar Replays ({sessions?.length || 0})
+            Atualizar Replays ({displaySessions.length})
           </button>
         </div>
       </div>
@@ -172,7 +204,7 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
                 filteredSessions.map((s) => (
                   <tr key={s.id || s.session_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-medium text-indigo-600 dark:text-indigo-400">
-                      {(s.session_id || '').substring(0, 16)}...
+                      {(s.session_id || '').substring(0, 18)}...
                     </td>
                     <td className="py-3.5 px-4 max-w-xs truncate font-medium text-slate-900 dark:text-slate-100">
                       {s.page_entry || '/'}
@@ -215,13 +247,6 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-500">
                     <p className="text-slate-400 font-medium">Nenhuma gravação de sessão encontrada no banco.</p>
-                    <button
-                      onClick={handleCreateSampleSession}
-                      disabled={isCreatingSample}
-                      className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/20 disabled:opacity-50"
-                    >
-                      <Plus size={14} /> {isCreatingSample ? 'Criando Replay...' : 'Gerar Sessão de Exemplo para Assistir Replay'}
-                    </button>
                   </td>
                 </tr>
               )}
