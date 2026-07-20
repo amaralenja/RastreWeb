@@ -1,6 +1,6 @@
 /**
  * RastreWeb Tracker Loader (rrweb client-side snippet)
- * Version: 1.0.0
+ * Version: 1.0.1
  * Lightweight multi-tenant session & heatmap recorder script.
  */
 (function () {
@@ -21,7 +21,16 @@
   }
 
   var siteKey = currentScript.getAttribute('data-site');
-  var endpoint = currentScript.getAttribute('data-endpoint') || (window.location.origin + '/api/ingest-session');
+  
+  // Extract origin from script tag src (e.g. https://rastre-web.vercel.app)
+  var scriptOrigin = 'https://rastre-web.vercel.app';
+  try {
+    if (currentScript.src) {
+      scriptOrigin = new URL(currentScript.src).origin;
+    }
+  } catch (e) {}
+
+  var endpoint = currentScript.getAttribute('data-endpoint') || (scriptOrigin + '/api/ingest-session');
 
   if (!siteKey) {
     console.warn('[RastreWeb] site_key ausente. O rastreamento está desativado.');
@@ -188,12 +197,12 @@
       blockClass: 'rw-block',
       ignoreClass: 'rw-ignore',
       sampling: {
-        mousemove: false, // Disables high-frequency mousemove for reduced payload
-        scroll: 150,      // Throttle scroll events (150ms)
-        input: 'last'     // Record only last input value
+        mousemove: false,
+        scroll: 150,
+        input: 'last'
       }
     });
 
-    console.log('[RastreWeb] Gravador ativado com sucesso para site_key:', siteKey);
+    console.log('[RastreWeb] Gravador ativado com sucesso para site_key:', siteKey, '| Endpoint:', endpoint);
   });
 })();
