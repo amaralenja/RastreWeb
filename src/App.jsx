@@ -496,6 +496,7 @@ export default function App() {
               <TestPage
                 projects={projects}
                 selectedProjectId={selectedProjectId}
+                onCreateProject={handleCreateProject}
               />
             )}
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Send, RefreshCw, CheckCircle2, AlertTriangle, ShieldCheck, Terminal, MousePointer, ShoppingCart, Lock } from 'lucide-react';
+import { Play, Send, RefreshCw, CheckCircle2, AlertTriangle, ShieldCheck, Terminal, MousePointer, ShoppingCart, Lock, Plus } from 'lucide-react';
 
-export default function TestPage({ projects, selectedProjectId }) {
-  const selectedProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
-  const siteKey = selectedProject?.site_key || 'site_321gli8fici';
+export default function TestPage({ projects, selectedProjectId, onCreateProject }) {
+  const selectedProject = projects?.find((p) => p.id === selectedProjectId) || projects?.[0];
+  const activeSiteKey = selectedProject?.site_key;
 
   const [logs, setLogs] = useState([]);
   const [clickCount, setClickCount] = useState(0);
@@ -16,18 +16,42 @@ export default function TestPage({ projects, selectedProjectId }) {
   };
 
   useEffect(() => {
-    addLog(`Página de Teste carregada para site_key: ${siteKey}`, 'success');
-  }, [siteKey]);
+    if (activeSiteKey) {
+      addLog(`Página de Teste vinculada ao site_key real: ${activeSiteKey}`, 'success');
+    } else {
+      addLog(`⚠️ Nenhum site cadastrado no banco. Clique em "Criar Site de Teste" abaixo.`, 'warning');
+    }
+  }, [activeSiteKey]);
+
+  // Handle auto creation of a real project if none exists yet
+  const handleEnsureProject = async () => {
+    if (!activeSiteKey && onCreateProject) {
+      addLog('Criando novo site no banco de dados Supabase...', 'info');
+      await onCreateProject({
+        name: 'Site de Teste Interno',
+        domain: window.location.hostname || 'localhost',
+      });
+      addLog('✅ Projeto criado com sucesso no banco Postgres!', 'success');
+    }
+  };
 
   // Trigger manual test ingestion
   const handleTestIngest = async () => {
+    let targetSiteKey = activeSiteKey;
+
+    if (!targetSiteKey) {
+      addLog('Criando projeto de teste no banco antes do envio...', 'warning');
+      await handleEnsureProject();
+      return;
+    }
+
     setIsSending(true);
-    addLog(`Enviando requisição de teste para /api/ingest-session com site_key: ${siteKey}...`, 'info');
+    addLog(`Enviando requisição de teste para /api/ingest-session com site_key: ${targetSiteKey}...`, 'info');
 
     const testSessionId = 'sess_test_' + Math.random().toString(36).substring(2, 8);
 
     const testPayload = {
-      site_key: siteKey,
+      site_key: targetSiteKey,
       session_id: testSessionId,
       page_entry: window.location.href,
       device: 'desktop',
@@ -61,7 +85,7 @@ export default function TestPage({ projects, selectedProjectId }) {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        addLog(`✅ SUCESSO! Ingestão aceita pelo servidor. Sessão criada: ${data.session_id}`, 'success');
+        addLog(`✅ SUCESSO! Ingestão aceita pelo servidor (HTTP 200). Sessão criada no Supabase: ${data.session_id}`, 'success');
       } else {
         addLog(`❌ ERRO (${res.status}): ${data.error || 'Falha na ingestão'}`, 'error');
       }
@@ -104,6 +128,20 @@ export default function TestPage({ projects, selectedProjectId }) {
         </button>
       </div>
 
+      {!activeSiteKey && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-600 dark:text-amber-300 flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <AlertTriangle size={16} /> Você ainda não tem nenhum site cadastrado no banco Supabase para validar a chave pública.
+          </span>
+          <button
+            onClick={handleEnsureProject}
+            className="px-3 py-1.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-500 transition-colors flex items-center gap-1 shrink-0"
+          >
+            <Plus size={14} /> Criar Site no Banco Agora
+          </button>
+        </div>
+      )}
+
       {/* Grid: Left Simulated Playground + Right Terminal Console */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -114,7 +152,7 @@ export default function TestPage({ projects, selectedProjectId }) {
               <MousePointer size={16} className="text-indigo-500" /> Playground Interativo do Cliente
             </span>
             <span className="text-[11px] font-mono bg-slate-100 dark:bg-slate-950 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-              Site Key: <strong className="text-indigo-600 dark:text-indigo-400">{siteKey}</strong>
+              Site Key: <strong className="text-indigo-600 dark:text-indigo-400">{activeSiteKey || 'Nenhum'}</strong>
             </span>
           </div>
 
