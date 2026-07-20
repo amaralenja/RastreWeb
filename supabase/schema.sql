@@ -1,6 +1,8 @@
--- ==============================================================================
--- RastreWeb - Multi-tenant SaaS Schema & RLS Security Policies
--- ==============================================================================
+/* 
+==============================================================================
+RastreWeb - Multi-tenant SaaS Schema & RLS Security Policies
+==============================================================================
+*/
 
 -- Enable pgcrypto extension for UUIDs and random bytes generation
 create extension if not exists "pgcrypto";
@@ -12,16 +14,15 @@ create table if not exists public.accounts (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid references auth.users(id) on delete cascade not null,
   name text default 'Minha Conta',
-  plan text default 'trial', -- 'trial', 'starter', 'pro', 'scale'
+  plan text default 'trial',
   monthly_session_quota int default 1000,
   sessions_used_this_cycle int default 0,
   stripe_customer_id text,
-  stripe_subscription_status text default 'trialing', -- 'trialing', 'active', 'past_due', 'canceled'
+  stripe_subscription_status text default 'trialing',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
--- Index for owner lookups
 create index if not exists idx_accounts_owner on public.accounts(owner_user_id);
 
 -- ------------------------------------------------------------------------------
@@ -49,7 +50,7 @@ create table if not exists public.sessions (
   account_id uuid references public.accounts(id) on delete cascade not null,
   project_id uuid references public.projects(id) on delete cascade not null,
   page_entry text,
-  device text default 'desktop', -- 'desktop', 'mobile', 'tablet'
+  device text default 'desktop',
   browser text,
   os text,
   country text default 'BR',
@@ -74,7 +75,7 @@ create table if not exists public.heatmap_events (
   account_id uuid references public.accounts(id) on delete cascade not null,
   project_id uuid references public.projects(id) on delete cascade not null,
   page_path text not null,
-  event_type text not null, -- 'click', 'scroll', 'mousemove'
+  event_type text not null,
   x_percent numeric(5, 2),
   y_percent numeric(5, 2),
   viewport_width int,
@@ -85,9 +86,9 @@ create table if not exists public.heatmap_events (
 create index if not exists idx_heatmap_project_page on public.heatmap_events(project_id, page_path);
 create index if not exists idx_heatmap_account on public.heatmap_events(account_id);
 
--- ==============================================================================
+-- ------------------------------------------------------------------------------
 -- ROW LEVEL SECURITY (RLS) & POLICIES
--- ==============================================================================
+-- ------------------------------------------------------------------------------
 
 alter table public.accounts enable row level security;
 alter table public.projects enable row level security;
@@ -104,41 +105,48 @@ as $$
   select id from public.accounts where owner_user_id = auth.uid();
 $$;
 
--- RLS Policies for `accounts`
+-- RLS Policies for accounts
+drop policy if exists "Users can view their own accounts" on public.accounts;
 create policy "Users can view their own accounts"
   on public.accounts for select
   using (owner_user_id = auth.uid());
 
+drop policy if exists "Users can update their own accounts" on public.accounts;
 create policy "Users can update their own accounts"
   on public.accounts for update
   using (owner_user_id = auth.uid());
 
--- RLS Policies for `projects`
+-- RLS Policies for projects
+drop policy if exists "Account owners can manage their projects" on public.projects;
 create policy "Account owners can manage their projects"
   on public.projects for all
   using (account_id in (select public.fn_current_user_account_ids()));
 
--- RLS Policies for `sessions`
+-- RLS Policies for sessions
+drop policy if exists "Account owners can view their sessions" on public.sessions;
 create policy "Account owners can view their sessions"
   on public.sessions for select
   using (account_id in (select public.fn_current_user_account_ids()));
 
+drop policy if exists "Account owners can delete their sessions" on public.sessions;
 create policy "Account owners can delete their sessions"
   on public.sessions for delete
   using (account_id in (select public.fn_current_user_account_ids()));
 
--- RLS Policies for `heatmap_events`
+-- RLS Policies for heatmap_events
+drop policy if exists "Account owners can view their heatmap events" on public.heatmap_events;
 create policy "Account owners can view their heatmap events"
   on public.heatmap_events for select
   using (account_id in (select public.fn_current_user_account_ids()));
 
+drop policy if exists "Account owners can delete their heatmap events" on public.heatmap_events;
 create policy "Account owners can delete their heatmap events"
   on public.heatmap_events for delete
   using (account_id in (select public.fn_current_user_account_ids()));
 
--- ==============================================================================
+-- ------------------------------------------------------------------------------
 -- AUTOMATIC ACCOUNT CREATION TRIGGER ON AUTH SIGNUP
--- ==============================================================================
+-- ------------------------------------------------------------------------------
 
 create or replace function public.handle_new_user_signup()
 returns trigger
@@ -157,20 +165,19 @@ begin
 end;
 $$;
 
--- Trigger execution
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user_signup();
 
--- ==============================================================================
+-- ------------------------------------------------------------------------------
 -- STORAGE BUCKET INITIALIZATION SQL
--- ==============================================================================
+-- ------------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('recordings', 'recordings', false)
 on conflict (id) do nothing;
 
--- Storage RLS Policies for authenticated users accessing their recordings
+drop policy if exists "Users can access recordings from their account" on storage.objects;
 create policy "Users can access recordings from their account"
   on storage.objects for select
   using (
