@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Send, RefreshCw, CheckCircle2, AlertTriangle, ShieldCheck, Terminal, MousePointer, ShoppingCart, Lock, Plus } from 'lucide-react';
+import { Play, Send, RefreshCw, CheckCircle2, AlertTriangle, ShieldCheck, Terminal, MousePointer, ShoppingCart, Lock, Plus, Key } from 'lucide-react';
 
 export default function TestPage({ projects, selectedProjectId, onCreateProject }) {
+  const [overrideSiteKey, setOverrideSiteKey] = useState('');
   const selectedProject = projects?.find((p) => p.id === selectedProjectId) || projects?.[0];
-  const activeSiteKey = selectedProject?.site_key;
+  const activeSiteKey = overrideSiteKey || selectedProject?.site_key || '';
 
   const [logs, setLogs] = useState([]);
   const [clickCount, setClickCount] = useState(0);
@@ -17,18 +18,18 @@ export default function TestPage({ projects, selectedProjectId, onCreateProject 
 
   useEffect(() => {
     if (activeSiteKey) {
-      addLog(`Página de Teste vinculada ao site_key real: ${activeSiteKey}`, 'success');
+      addLog(`Página de Teste vinculada ao site_key: ${activeSiteKey}`, 'success');
     } else {
-      addLog(`⚠️ Nenhum site cadastrado no banco. Clique em "Criar Site de Teste" abaixo.`, 'warning');
+      addLog(`⚠️ Nenhum site_key ativo. Selecione ou crie um projeto abaixo.`, 'warning');
     }
   }, [activeSiteKey]);
 
   // Handle auto creation of a real project if none exists yet
   const handleEnsureProject = async () => {
-    if (!activeSiteKey && onCreateProject) {
+    if (onCreateProject) {
       addLog('Criando novo site no banco de dados Supabase...', 'info');
       await onCreateProject({
-        name: 'Site de Teste Interno',
+        name: 'Site de Teste Interno ' + Math.floor(Math.random() * 100),
         domain: window.location.hostname || 'localhost',
       });
       addLog('✅ Projeto criado com sucesso no banco Postgres!', 'success');
@@ -37,21 +38,19 @@ export default function TestPage({ projects, selectedProjectId, onCreateProject 
 
   // Trigger manual test ingestion
   const handleTestIngest = async () => {
-    let targetSiteKey = activeSiteKey;
-
-    if (!targetSiteKey) {
+    if (!activeSiteKey) {
       addLog('Criando projeto de teste no banco antes do envio...', 'warning');
       await handleEnsureProject();
       return;
     }
 
     setIsSending(true);
-    addLog(`Enviando requisição de teste para /api/ingest-session com site_key: ${targetSiteKey}...`, 'info');
+    addLog(`Enviando requisição de teste para /api/ingest-session com site_key: ${activeSiteKey}...`, 'info');
 
     const testSessionId = 'sess_test_' + Math.random().toString(36).substring(2, 8);
 
     const testPayload = {
-      site_key: targetSiteKey,
+      site_key: activeSiteKey,
       session_id: testSessionId,
       page_entry: window.location.href,
       device: 'desktop',
@@ -128,19 +127,42 @@ export default function TestPage({ projects, selectedProjectId, onCreateProject 
         </button>
       </div>
 
-      {!activeSiteKey && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-600 dark:text-amber-300 flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <AlertTriangle size={16} /> Você ainda não tem nenhum site cadastrado no banco Supabase para validar a chave pública.
-          </span>
-          <button
-            onClick={handleEnsureProject}
-            className="px-3 py-1.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-500 transition-colors flex items-center gap-1 shrink-0"
-          >
-            <Plus size={14} /> Criar Site no Banco Agora
-          </button>
+      {/* Site Key Selector & Manual Input */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <Key size={18} className="text-indigo-500 shrink-0" />
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0">Chave de Rastreador (site_key):</span>
+          
+          {projects && projects.length > 0 ? (
+            <select
+              value={overrideSiteKey || selectedProject?.site_key || ''}
+              onChange={(e) => setOverrideSiteKey(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+            >
+              {projects.map((p) => (
+                <option key={p.id} value={p.site_key}>
+                  {p.name} ({p.site_key})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              placeholder="Cole uma site_key ou crie um projeto"
+              value={overrideSiteKey}
+              onChange={(e) => setOverrideSiteKey(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 w-64"
+            />
+          )}
         </div>
-      )}
+
+        <button
+          onClick={handleEnsureProject}
+          className="px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0"
+        >
+          <Plus size={14} /> Criar Novo Projeto no Banco
+        </button>
+      </div>
 
       {/* Grid: Left Simulated Playground + Right Terminal Console */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

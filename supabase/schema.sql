@@ -122,6 +122,12 @@ create policy "Account owners can manage their projects"
   on public.projects for all
   using (account_id in (select public.fn_current_user_account_ids()));
 
+-- Public policy allowing anonymous ingestion endpoint to lookup active site_key
+drop policy if exists "Public site_key lookup for ingestion" on public.projects;
+create policy "Public site_key lookup for ingestion"
+  on public.projects for select
+  using (is_active = true);
+
 -- RLS Policies for sessions
 drop policy if exists "Account owners can view their sessions" on public.sessions;
 create policy "Account owners can view their sessions"
@@ -143,6 +149,34 @@ drop policy if exists "Account owners can delete their heatmap events" on public
 create policy "Account owners can delete their heatmap events"
   on public.heatmap_events for delete
   using (account_id in (select public.fn_current_user_account_ids()));
+
+-- ------------------------------------------------------------------------------
+-- SECURITY DEFINER FUNCTION FOR INGESTION VALIDATION (BYPASSES RLS FOR INGEST)
+-- ------------------------------------------------------------------------------
+create or replace function public.fn_ingest_validate_site(p_site_key text)
+returns table (
+  project_id uuid,
+  account_id uuid,
+  is_active boolean,
+  monthly_session_quota int,
+  sessions_used_this_cycle int
+)
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  return query
+  select 
+    p.id as project_id,
+    p.account_id as account_id,
+    p.is_active as is_active,
+    a.monthly_session_quota as monthly_session_quota,
+    a.sessions_used_this_cycle as sessions_used_this_cycle
+  from public.projects p
+  join public.accounts a on a.id = p.account_id
+  where p.site_key = p_site_key;
+end;
+$$;
 
 -- ------------------------------------------------------------------------------
 -- AUTOMATIC ACCOUNT CREATION TRIGGER ON AUTH SIGNUP

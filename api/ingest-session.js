@@ -54,32 +54,53 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'site_key e session_id são obrigatórios' });
     }
 
-    // 1. Validate site_key against projects table
-    const { data: project, error: projectErr } = await supabase
-      .from('projects')
-      .select('id, account_id, is_active')
-      .eq('site_key', site_key)
-      .maybeSingle();
+    // 1. Validate site_key via SECURITY DEFINER function or direct query
+    let project = null;
+    let monthly_session_quota = 1000;
+    let sessions_used_this_cycle = 0;
 
-    if (projectErr || !project || !project.is_active) {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('fn_ingest_validate_site', { p_site_key: site_key });
+
+    if (!rpcErr && rpcData && rpcData.length > 0) {
+      project = {
+        id: rpcData[0].project_id,
+        account_id: rpcData[0].account_id,
+        is_active: rpcData[0].is_active,
+      };
+      monthly_session_quota = rpcData[0].monthly_session_quota || 1000;
+      sessions_used_this_cycle = rpcData[0].sessions_used_this_cycle || 0;
+    } else {
+      // Fallback query
+      const { data: projData, error: projErr } = await supabase
+        .from('projects')
+        .select('id, account_id, is_active')
+        .eq('site_key', site_key)
+        .maybeSingle();
+
+      if (projData) {
+        project = projData;
+        const { data: accData } = await supabase
+          .from('accounts')
+          .select('monthly_session_quota, sessions_used_this_cycle')
+          .eq('id', projData.account_id)
+          .maybeSingle();
+
+        if (accData) {
+          monthly_session_quota = accData.monthly_session_quota || 1000;
+          sessions_used_this_cycle = accData.sessions_used_this_cycle || 0;
+        }
+      }
+    }
+
+    if (!project || !project.is_active) {
       return res.status(403).json({ error: `Projeto não encontrado ou inativo para o site_key: ${site_key}` });
     }
 
     const account_id = project.account_id;
     const project_id = project.id;
 
-    // 2. Quota Check on Accounts table
-    const { data: account, error: accountErr } = await supabase
-      .from('accounts')
-      .select('id, monthly_session_quota, sessions_used_this_cycle')
-      .eq('id', account_id)
-      .maybeSingle();
-
-    if (accountErr || !account) {
-      return res.status(404).json({ error: 'Conta associada ao projeto não encontrada' });
-    }
-
-    if (account.sessions_used_this_cycle >= account.monthly_session_quota) {
+    // 2. Quota Check
+    if (sessions_used_this_cycle >= monthly_session_quota) {
       return res.status(429).json({ error: 'Limite de quota mensal de sessões atingido' });
     }
 
@@ -144,7 +165,7 @@ export default async function handler(req, res) {
       await supabase
         .from('accounts')
         .update({
-          sessions_used_this_cycle: (account.sessions_used_this_cycle || 0) + 1,
+          sessions_used_this_cycle: sessions_used_this_cycle + 1,
           updated_at: new Date().toISOString(),
         })
         .eq('id', account_id);
