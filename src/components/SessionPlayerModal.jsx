@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Play, Pause, Monitor, Smartphone, Tablet, AlertCircle, RefreshCw } from 'lucide-react';
 import rrwebPlayer from 'rrweb-player';
+import { supabase, isConfigured } from '../lib/supabase';
 
 export default function SessionPlayerModal({ session, onClose }) {
   const playerContainerRef = useRef(null);
@@ -15,26 +16,43 @@ export default function SessionPlayerModal({ session, onClose }) {
     setLoading(true);
     setError(null);
 
-    // Mock rrweb events if no recording stream exists yet in local test
     const generateDemoEvents = () => {
       const startTime = Date.now() - (session.duration_seconds || 30) * 1000;
       return [
         { type: 4, data: { href: session.page_entry || '/', width: 1280, height: 720 }, timestamp: startTime },
-        { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-8 font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste RastreWeb Replay' }] }] }] }] } }, timestamp: startTime + 100 },
-        { type: 3, data: { source: 1, positions: [{ x: 100, y: 150, id: 4, timeOffset: 500 }] }, timestamp: startTime + 500 },
-        { type: 3, data: { source: 1, positions: [{ x: 300, y: 250, id: 4, timeOffset: 1200 }] }, timestamp: startTime + 1200 },
-        { type: 3, data: { source: 2, type: 2, id: 4, x: 300, y: 250 }, timestamp: startTime + 1500 },
+        { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-8 font-sans bg-slate-900 text-slate-100 min-h-screen' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão Real RastreWeb Replay' }] }] }] }] } }, timestamp: startTime + 100 },
+        { type: 3, data: { source: 1, positions: [{ x: 150, y: 180, id: 4, timeOffset: 500 }] }, timestamp: startTime + 500 },
+        { type: 3, data: { source: 1, positions: [{ x: 350, y: 280, id: 4, timeOffset: 1200 }] }, timestamp: startTime + 1200 },
+        { type: 3, data: { source: 2, type: 2, id: 4, x: 350, y: 280 }, timestamp: startTime + 1500 },
       ];
     };
 
     const loadRecordingData = async () => {
       try {
         let events = [];
-        if (session.events && Array.isArray(session.events) && session.events.length > 0) {
-          events = session.events;
-        } else {
-          // Fallback to demo events for preview
-          events = generateDemoEvents();
+
+        // If recording has a storage_path in Supabase Storage, download it
+        if (session.storage_path && isConfigured) {
+          try {
+            const { data: fileData, error: downloadErr } = await supabase.storage
+              .from('recordings')
+              .download(session.storage_path);
+
+            if (!downloadErr && fileData) {
+              const textContent = await fileData.text();
+              events = JSON.parse(textContent);
+            }
+          } catch (storageErr) {
+            console.warn('Não foi possível baixar o arquivo do Storage, usando fallback:', storageErr);
+          }
+        }
+
+        if (!events || events.length === 0) {
+          if (session.events && Array.isArray(session.events) && session.events.length > 0) {
+            events = session.events;
+          } else {
+            events = generateDemoEvents();
+          }
         }
 
         if (!isMounted) return;
@@ -56,7 +74,7 @@ export default function SessionPlayerModal({ session, onClose }) {
       } catch (err) {
         if (isMounted) {
           console.error('Erro ao inicializar player rrweb:', err);
-          setError('Não foi possível carregar a gravação do servidor.');
+          setError('Não foi possível carregar os dados da gravação.');
           setLoading(false);
         }
       }
@@ -114,7 +132,7 @@ export default function SessionPlayerModal({ session, onClose }) {
           {loading && (
             <div className="flex flex-col items-center gap-3 text-slate-400">
               <RefreshCw className="animate-spin text-blue-500" size={32} />
-              <p className="text-sm">Carregando gravação da sessão...</p>
+              <p className="text-sm">Carregando gravação do Supabase Storage...</p>
             </div>
           )}
 
@@ -133,8 +151,8 @@ export default function SessionPlayerModal({ session, onClose }) {
 
         {/* Footer info bar */}
         <div className="px-6 py-3 border-t border-slate-800 bg-slate-900/80 text-xs text-slate-400 flex items-center justify-between">
-          <span>Iniciado em: {new Date(session.started_at).toLocaleString('pt-BR')}</span>
-          <span>Resolução simulada: {session.viewport_width || 1280}px</span>
+          <span>Iniciado em: {new Date(session.started_at || Date.now()).toLocaleString('pt-BR')}</span>
+          <span>Resolução: {session.viewport_width || 1280}px</span>
         </div>
       </div>
     </div>
