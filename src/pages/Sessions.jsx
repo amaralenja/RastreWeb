@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Play, Filter, AlertCircle, Monitor, Smartphone, Tablet, Search, Clock, ExternalLink, RefreshCw, Plus } from 'lucide-react';
-import { supabase, isConfigured } from '../lib/supabase';
 
 export default function Sessions({ sessions, onPlaySession, onRefresh, account, projects }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,40 +21,46 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
     const activeProject = projects?.[0];
     const sampleSessionId = 'sess_sample_' + Math.random().toString(36).substring(2, 8);
 
-    if (isConfigured && account && activeProject) {
+    if (activeProject && activeProject.site_key) {
       try {
-        const storagePath = `${account.id}/${activeProject.id}/${sampleSessionId}.json`;
-        
-        // Sample DOM recording events
-        const sampleEvents = [
-          { type: 4, data: { href: window.location.href, width: 1280, height: 720 }, timestamp: Date.now() - 10000 },
-          { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-10 bg-slate-900 text-white min-h-screen text-center font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste Real RastreWeb' }] }] }] }] } }, timestamp: Date.now() - 9500 },
-          { type: 3, data: { source: 1, positions: [{ x: 200, y: 150, id: 4, timeOffset: 500 }] }, timestamp: Date.now() - 8000 },
-          { type: 3, data: { source: 2, type: 2, id: 4, x: 200, y: 150 }, timestamp: Date.now() - 5000 },
-        ];
-
-        // Upload sample recording to Supabase storage
-        await supabase.storage
-          .from('recordings')
-          .upload(storagePath, JSON.stringify(sampleEvents), { contentType: 'application/json', upsert: true });
-
-        // Insert session record in Postgres
-        await supabase.from('sessions').insert({
+        const samplePayload = {
+          site_key: activeProject.site_key,
           session_id: sampleSessionId,
-          account_id: account.id,
-          project_id: activeProject.id,
-          page_entry: 'https://exemplo.com.br/produto',
+          page_entry: window.location.origin + '/demo-produto',
           device: 'desktop',
           browser: 'Chrome',
-          duration_seconds: 25,
+          started_at: new Date().toISOString(),
+          duration_seconds: 35,
           rage_click: true,
-          storage_path: storagePath,
-          started_at: new Date().toISOString()
+          events: [
+            { type: 4, data: { href: window.location.href, width: 1280, height: 720 }, timestamp: Date.now() - 10000 },
+            { type: 2, data: { node: { id: 1, type: 0, childNodes: [{ id: 2, type: 2, tagName: 'html', childNodes: [{ id: 3, type: 2, tagName: 'body', childNodes: [{ id: 4, type: 2, tagName: 'div', attributes: { class: 'p-10 bg-slate-900 text-white min-h-screen font-sans' }, childNodes: [{ id: 5, type: 3, textContent: 'Sessão de Teste Real RastreWeb' }] }] }] }] } }, timestamp: Date.now() - 9500 },
+            { type: 3, data: { source: 1, positions: [{ x: 200, y: 150, id: 4, timeOffset: 500 }] }, timestamp: Date.now() - 8000 },
+            { type: 3, data: { source: 2, type: 2, id: 4, x: 200, y: 150 }, timestamp: Date.now() - 5000 },
+          ],
+          heatmap_events: [
+            {
+              page_path: '/demo-produto',
+              event_type: 'click',
+              x_percent: 45,
+              y_percent: 30,
+              viewport_width: window.innerWidth,
+              session_id: sampleSessionId,
+            },
+          ],
+        };
+
+        const res = await fetch('/api/ingest-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(samplePayload),
         });
 
-        if (onRefresh) await onRefresh();
+        if (res.ok && onRefresh) {
+          await onRefresh();
+        }
       } catch (err) {
-        console.error('Erro ao criar sessão de amostra:', err);
+        console.error('Erro ao gerar amostra via API:', err);
       }
     }
 
@@ -212,9 +217,10 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
                     <p className="text-slate-400 font-medium">Nenhuma gravação de sessão encontrada no banco.</p>
                     <button
                       onClick={handleCreateSampleSession}
-                      className="mt-3 px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                      disabled={isCreatingSample}
+                      className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/20 disabled:opacity-50"
                     >
-                      <Plus size={14} /> Gerar Sessão de Exemplo para Assistir Replay
+                      <Plus size={14} /> {isCreatingSample ? 'Criando Replay...' : 'Gerar Sessão de Exemplo para Assistir Replay'}
                     </button>
                   </td>
                 </tr>

@@ -122,7 +122,6 @@ create policy "Account owners can manage their projects"
   on public.projects for all
   using (account_id in (select public.fn_current_user_account_ids()));
 
--- Public policy allowing anonymous ingestion endpoint to lookup active site_key
 drop policy if exists "Public site_key lookup for ingestion" on public.projects;
 create policy "Public site_key lookup for ingestion"
   on public.projects for select
@@ -132,6 +131,16 @@ create policy "Public site_key lookup for ingestion"
 drop policy if exists "Account owners can view their sessions" on public.sessions;
 create policy "Account owners can view their sessions"
   on public.sessions for select
+  using (account_id in (select public.fn_current_user_account_ids()));
+
+drop policy if exists "Account owners can insert their sessions" on public.sessions;
+create policy "Account owners can insert their sessions"
+  on public.sessions for insert
+  with check (account_id in (select public.fn_current_user_account_ids()));
+
+drop policy if exists "Account owners can update their sessions" on public.sessions;
+create policy "Account owners can update their sessions"
+  on public.sessions for update
   using (account_id in (select public.fn_current_user_account_ids()));
 
 drop policy if exists "Account owners can delete their sessions" on public.sessions;
@@ -144,6 +153,11 @@ drop policy if exists "Account owners can view their heatmap events" on public.h
 create policy "Account owners can view their heatmap events"
   on public.heatmap_events for select
   using (account_id in (select public.fn_current_user_account_ids()));
+
+drop policy if exists "Account owners can insert their heatmap events" on public.heatmap_events;
+create policy "Account owners can insert their heatmap events"
+  on public.heatmap_events for insert
+  with check (account_id in (select public.fn_current_user_account_ids()));
 
 drop policy if exists "Account owners can delete their heatmap events" on public.heatmap_events;
 create policy "Account owners can delete their heatmap events"
@@ -205,16 +219,23 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user_signup();
 
 -- ------------------------------------------------------------------------------
--- STORAGE BUCKET INITIALIZATION SQL
+-- STORAGE BUCKET & RLS INITIALIZATION SQL
 -- ------------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
-values ('recordings', 'recordings', false)
-on conflict (id) do nothing;
+values ('recordings', 'recordings', true)
+on conflict (id) do update set public = true;
 
 drop policy if exists "Users can access recordings from their account" on storage.objects;
 create policy "Users can access recordings from their account"
   on storage.objects for select
-  using (
-    bucket_id = 'recordings'
-    and (storage.foldername(name))[1] in (select id::text from public.accounts where owner_user_id = auth.uid())
-  );
+  using (bucket_id = 'recordings');
+
+drop policy if exists "Users can upload recordings" on storage.objects;
+create policy "Users can upload recordings"
+  on storage.objects for insert
+  with check (bucket_id = 'recordings');
+
+drop policy if exists "Users can update recordings" on storage.objects;
+create policy "Users can update recordings"
+  on storage.objects for update
+  using (bucket_id = 'recordings');
