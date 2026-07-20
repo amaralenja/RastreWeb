@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Send, RefreshCw, CheckCircle2, AlertTriangle, ShieldCheck, Terminal, MousePointer, ShoppingCart, Lock, Plus, Key } from 'lucide-react';
 
-export default function TestPage({ projects, selectedProjectId, onCreateProject }) {
+export default function TestPage({ projects, selectedProjectId, onCreateProject, onRefresh }) {
   const [overrideSiteKey, setOverrideSiteKey] = useState('');
   const selectedProject = projects?.find((p) => p.id === selectedProjectId) || projects?.[0];
   const activeSiteKey = overrideSiteKey || selectedProject?.site_key || '';
