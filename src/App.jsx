@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, isConfigured } from './lib/supabase';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -18,12 +18,14 @@ import {
   Home,
   ShieldCheck,
   Sun,
-  Moon
+  Moon,
+  Loader2
 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [loadingData, setLoadingData] = useState(false);
   
   // Theme State ('dark' | 'light')
   const [theme, setTheme] = useState(() => {
@@ -43,67 +45,124 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const [account, setAccount] = useState({
-    name: 'Amaral Shakir',
-    plan: 'starter',
-    monthly_session_quota: 10000,
-    sessions_used_this_cycle: 1465,
-  });
-
-  const [projects, setProjects] = useState([
-    {
-      id: 'proj_1',
-      name: 'E-commerce RastreWeb',
-      domain: 'loja.rastreweb.com',
-      site_key: 'site_8a7f92b10c4d',
-      is_active: true,
-    },
-    {
-      id: 'proj_2',
-      name: 'Landing Page SaaS',
-      domain: 'lp.rastreweb.com',
-      site_key: 'site_3e5d19a48f6b',
-      is_active: true,
-    },
-  ]);
-
-  const [selectedProjectId, setSelectedProjectId] = useState('proj_1');
-  const [sessions, setSessions] = useState([
-    {
-      id: 'sess_1',
-      session_id: 'sess_99a81bc3d2',
-      page_entry: 'https://loja.rastreweb.com/produto/12',
-      device: 'desktop',
-      browser: 'Chrome',
-      duration_seconds: 48,
-      rage_click: true,
-      started_at: new Date(Date.now() - 15 * 60000).toISOString(),
-    },
-    {
-      id: 'sess_2',
-      session_id: 'sess_44e10df8aa',
-      page_entry: 'https://loja.rastreweb.com/checkout',
-      device: 'mobile',
-      browser: 'Safari',
-      duration_seconds: 92,
-      rage_click: false,
-      started_at: new Date(Date.now() - 45 * 60000).toISOString(),
-    },
-    {
-      id: 'sess_3',
-      session_id: 'sess_12c98ef710',
-      page_entry: 'https://loja.rastreweb.com/',
-      device: 'desktop',
-      browser: 'Firefox',
-      duration_seconds: 24,
-      rage_click: false,
-      started_at: new Date(Date.now() - 120 * 60000).toISOString(),
-    },
-  ]);
-
+  // Multi-tenant Account, Projects & Sessions State
+  const [account, setAccount] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [heatmapEvents, setHeatmapEvents] = useState([]);
   const [activePlayerSession, setActivePlayerSession] = useState(null);
 
-  // Load user session on mount
+  // Load Real Account & Data from Supabase
+  const loadUserData = useCallback(async (currentUser) => {
+    if (!currentUser) return;
+    setLoadingData(true);
+
+    try {
+      if (!isConfigured) {
+        // Fallback for offline demo mode
+        setAccount({
+          id: 'acc_demo_123',
+          name: currentUser.user_metadata?.full_name || 'Minha Conta SaaS',
+          plan: 'starter',
+          monthly_session_quota: 10000,
+          sessions_used_this_cycle: 1465,
+        });
+        const demoProjects = [
+          {
+            id: 'proj_demo_1',
+            name: 'Meu E-commerce',
+            domain: 'loja.exemplo.com.br',
+            site_key: 'site_8a7f92b10c4d',
+            is_active: true,
+          },
+        ];
+        setProjects(demoProjects);
+        setSelectedProjectId('proj_demo_1');
+        setSessions([
+          {
+            id: 'sess_1',
+            session_id: 'sess_99a81bc3d2',
+            page_entry: 'https://loja.exemplo.com.br/produto/12',
+            device: 'desktop',
+            browser: 'Chrome',
+            duration_seconds: 48,
+            rage_click: true,
+            started_at: new Date(Date.now() - 15 * 60000).toISOString(),
+          },
+        ]);
+        setLoadingData(false);
+        return;
+      }
+
+      // 1. Fetch or auto-create account for current user
+      let { data: accData, error: accErr } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('owner_user_id', currentUser.id)
+        .maybeSingle();
+
+      if (!accData) {
+        // Create account if not present
+        const { data: newAcc } = await supabase
+          .from('accounts')
+          .insert({
+            owner_user_id: currentUser.id,
+            name: currentUser.user_metadata?.full_name || currentUser.email || 'Minha Conta',
+            plan: 'trial',
+            monthly_session_quota: 1000,
+          })
+          .select()
+          .single();
+
+        accData = newAcc;
+      }
+
+      setAccount(accData);
+
+      if (accData) {
+        // 2. Fetch Projects for this account
+        const { data: projData } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('account_id', accData.id)
+          .order('created_at', { ascending: false });
+
+        setProjects(projData || []);
+
+        if (projData && projData.length > 0) {
+          const defaultProjId = selectedProjectId || projData[0].id;
+          setSelectedProjectId(defaultProjId);
+
+          // 3. Fetch Sessions for this account
+          const { data: sessData } = await supabase
+            .from('sessions')
+            .select('*')
+            .eq('account_id', accData.id)
+            .order('started_at', { ascending: false });
+
+          setSessions(sessData || []);
+
+          // 4. Fetch Heatmap events
+          const { data: hmData } = await supabase
+            .from('heatmap_events')
+            .select('*')
+            .eq('account_id', accData.id);
+
+          setHeatmapEvents(hmData || []);
+        } else {
+          setSessions([]);
+          setHeatmapEvents([]);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados do Supabase:', err);
+    } finally {
+      setLoadingData(false);
+    }
+  }, [selectedProjectId]);
+
+  // Auth state listener
   useEffect(() => {
     if (!isConfigured) return;
 
@@ -120,71 +179,43 @@ export default function App() {
         loadUserData(session.user);
       } else {
         setUser(null);
+        setAccount(null);
+        setProjects([]);
+        setSessions([]);
       }
     });
 
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [loadUserData]);
 
-  const loadUserData = async (currentUser) => {
-    try {
-      const { data: accData } = await supabase
-        .from('accounts')
-        .select('*')
-        .eq('owner_user_id', currentUser.id)
-        .maybeSingle();
-
-      if (accData) {
-        setAccount(accData);
-
-        const { data: projData } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('account_id', accData.id);
-
-        if (projData && projData.length > 0) {
-          setProjects(projData);
-          setSelectedProjectId(projData[0].id);
-
-          const { data: sessData } = await supabase
-            .from('sessions')
-            .select('*')
-            .eq('account_id', accData.id)
-            .order('started_at', { ascending: false });
-
-          if (sessData) {
-            setSessions(sessData);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Carregamento de dados do Supabase:', err);
-    }
-  };
-
+  // Handle Real Project Creation in Database
   const handleCreateProject = async (newProj) => {
+    if (!account) return;
     const siteKey = 'site_' + Math.random().toString(36).substring(2, 14);
-    const createdObj = {
-      id: 'proj_' + Date.now(),
-      name: newProj.name,
-      domain: newProj.domain,
-      site_key: siteKey,
-      is_active: true,
-    };
 
     if (isConfigured && user) {
       try {
-        const { data } = await supabase.from('projects').insert({
-          account_id: account.id,
-          name: newProj.name,
-          domain: newProj.domain,
-          site_key: siteKey,
-        }).select().single();
+        const { data, error } = await supabase
+          .from('projects')
+          .insert({
+            account_id: account.id,
+            name: newProj.name,
+            domain: newProj.domain,
+            site_key: siteKey,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          alert('Erro ao criar projeto: ' + error.message);
+          return;
+        }
 
         if (data) {
-          setProjects((prev) => [...prev, data]);
+          setProjects((prev) => [data, ...prev]);
           setSelectedProjectId(data.id);
           return;
         }
@@ -193,20 +224,44 @@ export default function App() {
       }
     }
 
-    setProjects((prev) => [...prev, createdObj]);
-    setSelectedProjectId(createdObj.id);
+    // Fallback local create
+    const localObj = {
+      id: 'proj_' + Date.now(),
+      name: newProj.name,
+      domain: newProj.domain,
+      site_key: siteKey,
+      is_active: true,
+    };
+    setProjects((prev) => [localObj, ...prev]);
+    setSelectedProjectId(localObj.id);
   };
 
-  const handleDeleteProject = (projId) => {
+  // Handle Real Project Deletion in Database
+  const handleDeleteProject = async (projId) => {
+    if (isConfigured && account) {
+      await supabase.from('projects').delete().eq('id', projId).eq('account_id', account.id);
+    }
     setProjects((prev) => prev.filter((p) => p.id !== projId));
+    if (selectedProjectId === projId) {
+      setSelectedProjectId(projects.find((p) => p.id !== projId)?.id || null);
+    }
   };
 
-  const handleUpgradePlan = (planId) => {
+  const handleUpgradePlan = async (planId) => {
     const quotaMap = { trial: 1000, starter: 10000, pro: 50000, scale: 200000 };
+    const newQuota = quotaMap[planId] || 1000;
+
+    if (isConfigured && account) {
+      await supabase
+        .from('accounts')
+        .update({ plan: planId, monthly_session_quota: newQuota })
+        .eq('id', account.id);
+    }
+
     setAccount((prev) => ({
       ...prev,
       plan: planId,
-      monthly_session_quota: quotaMap[planId] || 1000,
+      monthly_session_quota: newQuota,
     }));
     alert(`Plano atualizado para ${planId.toUpperCase()} com sucesso!`);
   };
@@ -219,7 +274,7 @@ export default function App() {
   };
 
   if (!user) {
-    return <Auth onLoginSuccess={(u) => setUser(u)} />;
+    return <Auth onLoginSuccess={(u) => { setUser(u); loadUserData(u); }} />;
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
@@ -345,18 +400,17 @@ export default function App() {
         {/* TOP HEADER BAR */}
         <header className="min-h-[72px] px-4 sm:px-8 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0 transition-colors">
           
-          {/* Page Title */}
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-400 flex md:hidden items-center justify-center text-white font-bold text-xs">
               <ShieldCheck size={20} />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{getPageTitle()}</h1>
+            {loadingData && <Loader2 size={16} className="animate-spin text-indigo-500" />}
           </div>
 
-          {/* Right Controls */}
           <div className="flex flex-wrap items-center gap-3 ml-auto">
             
-            {/* Theme Toggle Button (Light/Dark Switcher) */}
+            {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
               className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm"
@@ -366,20 +420,24 @@ export default function App() {
             </button>
 
             {/* Project Selector Pill */}
-            <div className="bg-slate-100 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs font-medium max-w-full shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer truncate max-w-[180px] sm:max-w-xs"
-              >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-                    {p.name} ({p.domain || 'sem domínio'})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {projects && projects.length > 0 ? (
+              <div className="bg-slate-100 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs font-medium max-w-full shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <select
+                  value={selectedProjectId || ''}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer truncate max-w-[180px] sm:max-w-xs"
+                >
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                      {p.name} ({p.domain || 'sem domínio'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <span className="text-xs text-slate-400 italic">Nenhum site cadastrado</span>
+            )}
 
             {/* Notification Bell */}
             <button
@@ -393,10 +451,10 @@ export default function App() {
             {/* User Avatar */}
             <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-full p-1 pr-3 shrink-0">
               <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 via-emerald-500 to-rose-500 flex items-center justify-center text-xs font-bold text-white shadow-md">
-                {user.user_metadata?.name ? user.user_metadata.name.charAt(0).toUpperCase() : 'A'}
+                {user.user_metadata?.full_name ? user.user_metadata.full_name.charAt(0).toUpperCase() : user.email ? user.email.charAt(0).toUpperCase() : 'U'}
               </div>
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 hidden sm:inline">
-                {user.user_metadata?.name || 'Amaral'}
+                {user.user_metadata?.full_name || user.email?.split('@')[0] || 'Minha Conta'}
               </span>
             </div>
 
@@ -419,7 +477,7 @@ export default function App() {
 
             {activeTab === 'sessions' && (
               <Sessions
-                sessions={sessions}
+                sessions={sessions.filter(s => !selectedProjectId || s.project_id === selectedProjectId || !s.project_id)}
                 onPlaySession={(s) => setActivePlayerSession(s)}
               />
             )}
@@ -432,7 +490,13 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'heatmaps' && <Heatmaps projects={projects} />}
+            {activeTab === 'heatmaps' && (
+              <Heatmaps
+                projects={projects}
+                selectedProjectId={selectedProjectId}
+                heatmapEvents={heatmapEvents.filter(e => !selectedProjectId || e.project_id === selectedProjectId)}
+              />
+            )}
 
             {activeTab === 'billing' && (
               <Billing account={account} onUpgradePlan={handleUpgradePlan} />
