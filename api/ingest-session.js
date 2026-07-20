@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
-  // CORS Headers for cross-origin ingestion from any client website
+  // Enable CORS Headers for cross-origin ingestion from any domain
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'authorization, x-client-info, apikey, content-type');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -19,11 +19,22 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ error: 'Variáveis de ambiente do Supabase não configuradas na Vercel.' });
+      return res.status(500).json({ error: 'Variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY não encontradas na Vercel.' });
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const body = req.body || {};
+
+    // Safely parse body if sent as raw text or JSON string via sendBeacon
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return res.status(400).json({ error: 'Payload JSON inválido' });
+      }
+    }
+
+    body = body || {};
 
     const {
       site_key,
@@ -51,7 +62,7 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     if (projectErr || !project || !project.is_active) {
-      return res.status(403).json({ error: 'Projeto não encontrado ou inativo para o site_key informado' });
+      return res.status(403).json({ error: `Projeto não encontrado ou inativo para o site_key: ${site_key}` });
     }
 
     const account_id = project.account_id;

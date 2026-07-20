@@ -6,6 +6,7 @@ import Projects from './pages/Projects';
 import Sessions from './pages/Sessions';
 import Heatmaps from './pages/Heatmaps';
 import Billing from './pages/Billing';
+import TestPage from './pages/TestPage';
 import SessionPlayerModal from './components/SessionPlayerModal';
 import {
   Video,
@@ -19,7 +20,8 @@ import {
   ShieldCheck,
   Sun,
   Moon,
-  Loader2
+  Loader2,
+  FlaskConical
 } from 'lucide-react';
 
 export default function App() {
@@ -274,6 +276,7 @@ export default function App() {
     { id: 'sessions', label: 'Gravações & Replays', icon: Video },
     { id: 'projects', label: 'Sites & Snippet Code', icon: Globe },
     { id: 'heatmaps', label: 'Heatmaps de Cliques', icon: Layers },
+    { id: 'test', label: 'Laboratório de Testes', icon: FlaskConical },
     { id: 'billing', label: 'Planos & Assinatura', icon: CreditCard },
   ];
 
@@ -283,6 +286,7 @@ export default function App() {
       case 'sessions': return 'Sessões & Replays';
       case 'projects': return 'Sites & Snippet Code';
       case 'heatmaps': return 'Heatmaps de Cliques';
+      case 'test': return 'Laboratório de Testes';
       case 'billing': return 'Planos & Billing';
       default: return 'Dashboard';
     }
@@ -384,10 +388,10 @@ export default function App() {
         })}
       </div>
 
-      {/* MAIN CANVAS WRAPPER — FIXED VIEWPORT WITH INDEPENDENT TAB SCROLLING */}
+      {/* MAIN CANVAS WRAPPER */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10 min-w-0">
         
-        {/* TOP HEADER BAR (FIXED STICKY) */}
+        {/* TOP HEADER BAR */}
         <header className="h-[72px] px-4 sm:px-8 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0 transition-colors z-30">
           
           <div className="flex items-center gap-3">
@@ -452,7 +456,7 @@ export default function App() {
 
         </header>
 
-        {/* TAB CONTENT SCROLL AREA (ONLY THIS PORTION SCROLLS VERTICALLY) */}
+        {/* TAB CONTENT SCROLL AREA */}
         <main className="flex-1 h-[calc(100vh-72px)] overflow-y-auto p-4 sm:p-8 pb-24 md:pb-8">
           <div className="max-w-[1800px] mx-auto">
             {activeTab === 'dashboard' && (
@@ -485,6 +489,13 @@ export default function App() {
                 projects={projects}
                 selectedProjectId={selectedProjectId}
                 heatmapEvents={heatmapEvents.filter(e => !selectedProjectId || e.project_id === selectedProjectId)}
+              />
+            )}
+
+            {activeTab === 'test' && (
+              <TestPage
+                projects={projects}
+                selectedProjectId={selectedProjectId}
               />
             )}
 
