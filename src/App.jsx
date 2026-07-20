@@ -8,7 +8,6 @@ import Heatmaps from './pages/Heatmaps';
 import Billing from './pages/Billing';
 import SessionPlayerModal from './components/SessionPlayerModal';
 import {
-  LayoutGrid,
   Video,
   Globe,
   Layers,
@@ -18,16 +17,15 @@ import {
   Bell,
   Home,
   ShieldCheck,
-  ChevronDown,
-  Plus,
-  User,
-  Search,
-  Sparkles
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const [account, setAccount] = useState({
     name: 'Amaral Shakir',
     plan: 'starter',
@@ -227,154 +225,164 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 bg-mesh-glow flex items-center justify-center p-3 sm:p-6 text-slate-100 selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen w-full bg-slate-950 bg-mesh-glow flex flex-col md:flex-row text-slate-100 selection:bg-blue-500 selection:text-white overflow-x-hidden">
       
-      {/* Floating Outer Container matching the reference image layout */}
-      <div className="w-full max-w-[1550px] min-h-[920px] bg-slate-900/90 backdrop-blur-2xl border border-slate-800/80 rounded-[32px] shadow-2xl flex overflow-hidden relative">
+      {/* Organic Background Lines Glow */}
+      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-gradient-to-bl from-blue-500/10 via-rose-500/5 to-transparent rounded-full blur-3xl pointer-events-none z-0" />
+      <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-gradient-to-tr from-amber-500/5 via-emerald-500/5 to-transparent rounded-full blur-3xl pointer-events-none z-0" />
+
+      {/* DESKTOP ICON-ONLY LEFT SIDEBAR (HIDDEN ON MOBILE, VISIBLE ON MD+) */}
+      <aside className="hidden md:flex w-20 bg-slate-950/90 border-r border-slate-800/80 flex-col items-center justify-between py-6 shrink-0 z-30 relative min-h-screen">
         
-        {/* Organic Background Lines Effect */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-blue-500/10 via-rose-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-amber-500/5 via-emerald-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
+        {/* Top Brand Icon */}
+        <div className="flex flex-col items-center gap-6">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/25 hover:scale-105 transition-transform"
+            title="RastreWeb SaaS"
+          >
+            <ShieldCheck size={24} />
+          </button>
 
-        {/* LEFT VERTICAL SIDEBAR — ICON ONLY (EXACT DESIGN MATCH FROM IMAGE) */}
-        <aside className="w-20 bg-slate-950/80 border-r border-slate-800/80 flex flex-col items-center justify-between py-6 shrink-0 relative z-20">
-          
-          {/* Top Brand Icon */}
-          <div className="flex flex-col items-center gap-6">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/25 hover:scale-105 transition-transform"
-              title="RastreWeb SaaS"
-            >
-              <ShieldCheck size={24} />
-            </button>
+          <div className="w-8 h-[1px] bg-slate-800/80" />
 
-            <div className="w-8 h-[1px] bg-slate-800/80" />
+          {/* Navigation Icons */}
+          <nav className="flex flex-col items-center gap-3">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
 
-            {/* Icon-Only Navigation Buttons */}
-            <nav className="flex flex-col items-center gap-3">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
+              return (
+                <div key={item.id} className="relative group flex items-center">
+                  {isActive && (
+                    <span className="absolute -left-[18px] w-2 h-6 bg-rose-500 rounded-r-full shadow-[0_0_12px_rgba(244,63,94,0.8)]" />
+                  )}
 
-                return (
-                  <div key={item.id} className="relative group flex items-center">
-                    {/* Active Indicator Dot on left border (exactly as seen in reference image) */}
-                    {isActive && (
-                      <span className="absolute -left-[18px] w-2 h-6 bg-rose-500 rounded-r-full shadow-[0_0_12px_rgba(244,63,94,0.8)]" />
-                    )}
+                  <button
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <Icon size={20} />
+                  </button>
 
-                    <button
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
-                        isActive
-                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                          : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                      }`}
-                    >
-                      <Icon size={20} />
-                    </button>
-
-                    {/* Tooltip on hover */}
-                    <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
-                      {item.label}
-                    </div>
+                  <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
+                    {item.label}
                   </div>
-                );
-              })}
-            </nav>
-          </div>
+                </div>
+              );
+            })}
+          </nav>
+        </div>
 
-          {/* Bottom Settings & Logout Icons */}
-          <div className="flex flex-col items-center gap-3">
+        {/* Bottom Icons */}
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={() => setActiveTab('projects')}
+            className="w-11 h-11 rounded-2xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 flex items-center justify-center transition-colors relative group"
+            title="Configurações"
+          >
+            <Settings size={20} />
+            <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
+              Configurações
+            </div>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="w-11 h-11 rounded-2xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors relative group"
+            title="Sair"
+          >
+            <LogOut size={20} />
+            <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
+              Sair
+            </div>
+          </button>
+        </div>
+      </aside>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR (VISIBLE ONLY ON MOBILE < MD) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 z-50 px-4 py-2 flex items-center justify-around">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
             <button
-              onClick={() => setActiveTab('projects')}
-              className="w-11 h-11 rounded-2xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 flex items-center justify-center transition-colors relative group"
-              title="Configurações"
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`p-2.5 rounded-xl flex flex-col items-center gap-1 transition-colors ${
+                isActive ? 'text-rose-400 bg-rose-500/10 font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <Settings size={20} />
-              <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
-                Configurações
-              </div>
+              <Icon size={20} />
+              <span className="text-[10px]">{item.id.charAt(0).toUpperCase() + item.id.slice(1)}</span>
             </button>
+          );
+        })}
+      </div>
 
-            <button
-              onClick={handleLogout}
-              className="w-11 h-11 rounded-2xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors relative group"
-              title="Sair da Conta"
-            >
-              <LogOut size={20} />
-              <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-100 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-50">
-                Sair
-              </div>
-            </button>
-          </div>
-
-        </aside>
-
-        {/* MAIN CANVAS BODY */}
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-900/40 relative z-10">
+      {/* MAIN CANVAS WRAPPER — FULL SCREEN RESPONSIVE */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen relative z-10">
+        
+        {/* TOP HEADER BAR */}
+        <header className="min-h-[72px] px-4 sm:px-8 py-3 border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
           
-          {/* TOP HEADER BAR — MATCHING REFERENCE IMAGE HEADER */}
-          <header className="h-20 px-8 flex items-center justify-between border-b border-slate-800/60 shrink-0">
+          {/* Page Title */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex md:hidden items-center justify-center text-white font-bold text-xs">
+              <ShieldCheck size={20} />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight">{getPageTitle()}</h1>
+          </div>
+
+          {/* Right Controls */}
+          <div className="flex flex-wrap items-center gap-3 ml-auto">
             
-            {/* Left Page Title */}
-            <div>
-              <h1 className="text-2xl font-bold text-slate-100 tracking-tight">{getPageTitle()}</h1>
-            </div>
-
-            {/* Right Header Controls */}
-            <div className="flex items-center gap-5">
-              
-              {/* Project Selector Pill (Cards & Balance style pill badge) */}
-              <div className="bg-slate-950/80 border border-slate-800 rounded-full px-4 py-1.5 flex items-center gap-3 text-xs font-medium shadow-inner">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <select
-                  value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer pr-1"
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
-                      {p.name} ({p.domain || 'sem domínio'})
-                    </option>
-                  ))}
-                </select>
-                <span className="text-slate-500 font-mono text-[11px] border-l border-slate-800 pl-2">
-                  KEY: {selectedProject?.site_key?.substring(0, 10)}...
-                </span>
-              </div>
-
-              {/* Notification Bell Button */}
-              <button
-                className="w-10 h-10 rounded-full bg-slate-950/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-100 hover:border-slate-700 transition-colors relative"
-                title="Notificações"
+            {/* Project Selector Pill */}
+            <div className="bg-slate-950/90 border border-slate-800 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs font-medium max-w-full">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer truncate max-w-[180px] sm:max-w-xs"
               >
-                <Bell size={18} />
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500" />
-              </button>
-
-              {/* User Avatar & Info Badge */}
-              <div className="flex items-center gap-3 bg-slate-950/80 border border-slate-800/80 rounded-full p-1.5 pr-4">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-md">
-                  {user.user_metadata?.name ? user.user_metadata.name.charAt(0).toUpperCase() : 'A'}
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-200 leading-tight">
-                    {user.user_metadata?.name || 'Amaral Shakir'}
-                  </p>
-                  <p className="text-[10px] text-blue-400 font-medium capitalize leading-tight">
-                    Plano {account?.plan || 'starter'}
-                  </p>
-                </div>
-              </div>
-
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
+                    {p.name} ({p.domain || 'sem domínio'})
+                  </option>
+                ))}
+              </select>
             </div>
 
-          </header>
+            {/* Notification Bell */}
+            <button
+              className="w-9 h-9 rounded-full bg-slate-950/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-100 transition-colors relative shrink-0"
+              title="Notificações"
+            >
+              <Bell size={16} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500" />
+            </button>
 
-          {/* MAIN TAB CONTENT */}
-          <main className="flex-1 p-8 overflow-y-auto">
+            {/* User Avatar */}
+            <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-full p-1 pr-3 shrink-0">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white">
+                {user.user_metadata?.name ? user.user_metadata.name.charAt(0).toUpperCase() : 'A'}
+              </div>
+              <span className="text-xs font-bold text-slate-200 hidden sm:inline">
+                {user.user_metadata?.name || 'Amaral'}
+              </span>
+            </div>
+
+          </div>
+
+        </header>
+
+        {/* MAIN SCROLLABLE CONTENT AREA (FILLS ENTIRE SCREEN HEIGHT) */}
+        <main className="flex-1 p-4 sm:p-8 overflow-y-auto pb-24 md:pb-8">
+          <div className="max-w-[1800px] mx-auto">
             {activeTab === 'dashboard' && (
               <Dashboard
                 account={account}
@@ -405,9 +413,8 @@ export default function App() {
             {activeTab === 'billing' && (
               <Billing account={account} onUpgradePlan={handleUpgradePlan} />
             )}
-          </main>
-
-        </div>
+          </div>
+        </main>
 
       </div>
 
