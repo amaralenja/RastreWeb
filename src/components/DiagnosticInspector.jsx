@@ -63,7 +63,38 @@ export default function DiagnosticInspector({ user, account, projects, sessions,
       addLog('DB_PROJECTS', 'Exceção ao consultar projects', e.message, 'error');
     }
 
-    // 4. Query Sessions table
+    // 4. Test Ingestion Edge Endpoint FIRST (so a test session is created in Postgres)
+    const targetSiteKey = projects?.[0]?.site_key || 'site_321gli8fici';
+    try {
+      const pingPayload = {
+        site_key: targetSiteKey,
+        session_id: 'sess_ping_' + Math.random().toString(36).substring(2, 8),
+        page_entry: '/ping-diagnostic',
+        device: 'desktop',
+        browser: 'DiagnosticTester',
+        events: [{ type: 4, data: { href: '/ping' }, timestamp: Date.now() }],
+      };
+
+      const res = await fetch('/api/ingest-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pingPayload),
+      });
+
+      const resData = await res.json();
+      addLog('API_ENDPOINT', `Resposta da API /api/ingest-session (HTTP ${res.status}) com site_key (${targetSiteKey})`, resData, res.ok ? 'success' : 'warning');
+    } catch (e) {
+      addLog('API_ENDPOINT', 'Falha de rede na API /api/ingest-session', e.message, 'error');
+    }
+
+    // Refresh parent state to ensure newly ingested session is fetched
+    if (onRefresh) {
+      try {
+        await onRefresh();
+      } catch (e) {}
+    }
+
+    // 5. Query Sessions table AFTER ingestion ping
     try {
       if (user && isConfigured) {
         const { data: sessData, error: sessErr } = await supabase
@@ -79,29 +110,6 @@ export default function DiagnosticInspector({ user, account, projects, sessions,
       }
     } catch (e) {
       addLog('DB_SESSIONS', 'Exceção ao consultar sessions', e.message, 'error');
-    }
-
-    // 5. Test Ingestion Edge Endpoint
-    try {
-      const pingPayload = {
-        site_key: projects?.[0]?.site_key || 'site_ping_test',
-        session_id: 'sess_ping_' + Date.now().toString(36),
-        page_entry: '/ping-diagnostic',
-        device: 'desktop',
-        browser: 'DiagnosticTester',
-        events: [{ type: 4, data: { href: '/ping' }, timestamp: Date.now() }],
-      };
-
-      const res = await fetch('/api/ingest-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pingPayload),
-      });
-
-      const resData = await res.json();
-      addLog('API_ENDPOINT', `Resposta da API /api/ingest-session (HTTP ${res.status})`, resData, res.ok ? 'success' : 'warning');
-    } catch (e) {
-      addLog('API_ENDPOINT', 'Falha de rede na API /api/ingest-session', e.message, 'error');
     }
 
     setReport(logs);
@@ -139,7 +147,6 @@ export default function DiagnosticInspector({ user, account, projects, sessions,
             onClick={(e) => {
               e.stopPropagation();
               runFullDiagnostics();
-              if (onRefresh) onRefresh();
             }}
             disabled={isRunning}
             className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
