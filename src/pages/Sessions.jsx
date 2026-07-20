@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Play, Filter, AlertCircle, Monitor, Smartphone, Tablet, Search, Clock, ExternalLink, RefreshCw, Plus } from 'lucide-react';
-import { supabase, isConfigured } from '../lib/supabase';
+import DiagnosticInspector from '../components/DiagnosticInspector';
 
-export default function Sessions({ sessions, onPlaySession, onRefresh, account, projects }) {
+export default function Sessions({ sessions, onPlaySession, onRefresh, account, projects, user }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deviceFilter, setDeviceFilter] = useState('all');
   const [rageOnly, setRageOnly] = useState(false);
@@ -160,6 +160,15 @@ export default function Sessions({ sessions, onPlaySession, onRefresh, account, 
           </button>
         </div>
       </div>
+
+      {/* Transparent Live Inspector Component */}
+      <DiagnosticInspector
+        user={user}
+        account={account}
+        projects={projects}
+        sessions={sessions}
+        onRefresh={onRefresh}
+      />
 
       {/* Filter Bar */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">

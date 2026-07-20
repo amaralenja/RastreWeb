@@ -474,6 +474,7 @@ export default function App() {
                 sessions={sessions}
                 account={account}
                 projects={projects}
+                user={user}
                 onPlaySession={(s) => setActivePlayerSession(s)}
                 onRefresh={() => user && loadUserData(user)}
               />
